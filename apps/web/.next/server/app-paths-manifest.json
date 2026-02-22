@@ -1,7 +1,0 @@
-{
-  "/_not-found/page": "app/_not-found/page.js",
-  "/api/sandbox/prompt/route": "app/api/sandbox/prompt/route.js",
-  "/api/sandbox/stop/route": "app/api/sandbox/stop/route.js",
-  "/api/sandbox/create/route": "app/api/sandbox/create/route.js",
-  "/page": "app/page.js"
-}

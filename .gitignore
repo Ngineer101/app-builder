@@ -9,3 +9,7 @@ node_modules
 
 # app-builder state
 /.app-builder
+
+# next
+/apps/web/.next
+/apps/web/out
