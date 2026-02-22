@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { ChangeEvent } from "react";
 import type { KitId } from "@app-builder/core";
 import { kits } from "@app-builder/core";
@@ -19,6 +19,34 @@ export default function HomePage() {
   const [created, setCreated] = useState<CreateResp | null>(null);
   const [prompt, setPrompt] = useState("Add a landing page with a simple hero and a call-to-action button.");
   const [logs, setLogs] = useState<string>("");
+
+  // hydrate from localStorage (best-effort)
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem("app-builder:poc");
+      if (!raw) return;
+      const data = JSON.parse(raw) as { created?: CreateResp; kitId?: KitId; prompt?: string; logs?: string };
+      if (data.kitId) setKitId(data.kitId);
+      if (typeof data.prompt === "string") setPrompt(data.prompt);
+      if (typeof data.logs === "string") setLogs(data.logs);
+      if (data.created?.sandboxId) setCreated(data.created);
+    } catch {
+      // ignore
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // persist to localStorage
+  useEffect(() => {
+    try {
+      localStorage.setItem(
+        "app-builder:poc",
+        JSON.stringify({ kitId, prompt, logs, created }, null, 0)
+      );
+    } catch {
+      // ignore
+    }
+  }, [kitId, prompt, logs, created]);
 
   async function create() {
     setBusy(true);
@@ -74,6 +102,16 @@ export default function HomePage() {
     } finally {
       setBusy(false);
     }
+  }
+
+  function forgetLocal() {
+    try {
+      localStorage.removeItem("app-builder:poc");
+    } catch {
+      // ignore
+    }
+    setCreated(null);
+    setLogs("");
   }
 
   const previewUrl = created ? Object.values(created.previewUrls)[0] : null;
@@ -134,6 +172,16 @@ export default function HomePage() {
                   <span className="text-white/40">preview:</span> {previewUrl}
                 </div>
               )}
+              <div className="mt-2">
+                <button
+                  className="rounded-lg border border-white/10 bg-black/40 px-2 py-1 text-[11px] text-white/70 hover:bg-black/30"
+                  onClick={forgetLocal}
+                  disabled={busy}
+                  title="Clear local saved session"
+                >
+                  Forget local session
+                </button>
+              </div>
             </div>
           )}
         </div>

@@ -46,7 +46,7 @@ export const kits: Record<KitId, Kit> = {
       // shadcn/ui (uses defaults; may still prompt on major changes)
       { cmd: "pnpm dlx shadcn@latest init -d", cwd: "app" },
     ],
-    dev: { cmd: "pnpm dev --port 3000", cwd: "app" },
+    dev: { cmd: "pnpm dev --hostname 0.0.0.0 --port 3000", cwd: "app" },
     check: { cmd: "pnpm lint && pnpm -s exec tsc -p tsconfig.json --noEmit", cwd: "app" },
   },
   "vite-react": {

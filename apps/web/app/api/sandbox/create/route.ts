@@ -34,6 +34,27 @@ export async function POST(req: Request) {
     const previewUrls: Record<string, string> = {};
     for (const p of kit.ports) previewUrls[p] = sandbox.domain(p);
 
+    // QoL: wait until the dev server is reachable before returning
+    const firstPreview = Object.values(previewUrls)[0];
+    if (firstPreview) {
+      const deadline = Date.now() + 30_000;
+      let lastErr: any = null;
+      while (Date.now() < deadline) {
+        try {
+          const r = await fetch(firstPreview, { cache: "no-store" });
+          if (r.ok) break;
+          lastErr = new Error(`HTTP ${r.status}`);
+        } catch (e) {
+          lastErr = e;
+        }
+        await new Promise((r) => setTimeout(r, 1000));
+      }
+      // don't hard-fail on readiness; return anyway so user can retry
+      if (lastErr) {
+        console.warn("preview not ready yet", String(lastErr));
+      }
+    }
+
     return NextResponse.json({
       sandboxId: sandbox.sandboxId,
       kitId,
