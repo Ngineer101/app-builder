@@ -23,7 +23,14 @@ export async function POST(req: Request) {
     // setup
     for (const step of kit.setup) {
       const cwd = step.cwd ? `/vercel/sandbox/${step.cwd}` : "/vercel/sandbox";
-      const res = await sandbox.runCommand({ cmd: step.cmd, cwd, sudo: step.sudo, detached: false });
+      const res = await sandbox.runCommand({
+        cmd: "sh",
+        args: ["-lc", step.cmd],
+        cwd,
+        sudo: step.sudo,
+        detached: false,
+      });
+
       if (res.exitCode !== 0) {
         const stdout = await res.stdout();
         const stderr = await res.stderr();
@@ -32,8 +39,17 @@ export async function POST(req: Request) {
     }
 
     // start dev server
-    const devCwd = kit.dev.cwd ? `/vercel/sandbox/${kit.dev.cwd}` : "/vercel/sandbox";
-    const devCmd = await sandbox.runCommand({ cmd: kit.dev.cmd, cwd: devCwd, detached: true });
+    const devCwd = kit.dev.cwd
+      ? `/vercel/sandbox/${kit.dev.cwd}`
+      : "/vercel/sandbox";
+    const devCmd = await sandbox.runCommand({
+      cmd: "sh",
+      args: ["-lc", kit.dev.cmd],
+      cwd: devCwd,
+      detached: true,
+    });
+
+    console.log(`Dev server started with cmdId ${devCmd.cmdId}`);
 
     const previewUrls: Record<string, string> = {};
     for (const p of kit.ports) previewUrls[p] = sandbox.domain(p);
@@ -66,6 +82,10 @@ export async function POST(req: Request) {
       previewUrls,
     });
   } catch (e: any) {
-    return NextResponse.json({ error: e?.message ?? String(e) }, { status: 400 });
+    console.error("Error creating sandbox:", e);
+    return NextResponse.json(
+      { error: e?.message ?? String(e) },
+      { status: 400 },
+    );
   }
 }
