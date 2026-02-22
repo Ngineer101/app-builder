@@ -37,6 +37,20 @@ Run the CLI:
 pnpm dev:cli -- --help
 ```
 
+## Deploy to Vercel
+
+### Environment variables
+
+Required:
+- `OPENAI_API_KEY` (forwarded into sandboxes so `opencode` can generate code)
+
+Vercel Sandbox auth:
+- On Vercel, OIDC *should* work automatically (recommended).
+- Fallback (access token auth): set **all three**
+  - `VERCEL_TEAM_ID`
+  - `VERCEL_PROJECT_ID`
+  - `VERCEL_TOKEN`
+
 ## POC Spec
 
 See: `POC_SPEC.md`

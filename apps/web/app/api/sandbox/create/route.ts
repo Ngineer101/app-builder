@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { Sandbox } from "@vercel/sandbox";
 import { kits, KitId } from "@app-builder/core";
+import { getSandboxAuth } from "../_lib/vercelSandboxAuth";
 
 export const runtime = "nodejs";
 
@@ -10,7 +11,10 @@ export async function POST(req: Request) {
     const kitId = KitId.parse(body?.kitId);
     const kit = kits[kitId];
 
+    const auth = getSandboxAuth();
+
     const sandbox = await Sandbox.create({
+      ...auth,
       runtime: kit.runtime,
       ports: kit.ports,
       timeout: 30 * 60 * 1000,

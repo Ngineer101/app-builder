@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { Sandbox } from "@vercel/sandbox";
 import { kits, KitId } from "@app-builder/core";
+import { getSandboxAuth } from "../_lib/vercelSandboxAuth";
 
 export const runtime = "nodejs";
 
@@ -15,7 +16,8 @@ export async function POST(req: Request) {
     if (!sandboxId) throw new Error("sandboxId required");
     if (!text.trim()) throw new Error("text required");
 
-    const sandbox = await Sandbox.get({ sandboxId });
+    const auth = getSandboxAuth();
+    const sandbox = await Sandbox.get({ sandboxId, ...auth });
 
     const cwd = kit.appDir ? `/vercel/sandbox/${kit.appDir}` : "/vercel/sandbox";
 
