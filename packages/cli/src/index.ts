@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 import { Command } from "commander";
 import { Sandbox } from "@vercel/sandbox";
-import { kits, KitId } from "./kits.js";
+import { kits, KitId } from "@app-builder/core";
 import { createSandbox, run } from "./vercelSandbox.js";
 import { readState, writeState } from "./state.js";
 

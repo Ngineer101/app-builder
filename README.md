@@ -17,11 +17,24 @@ vercel link
 vercel env pull
 ```
 
-## Getting started
+## Getting started (local)
+
+Install deps:
 
 ```bash
 pnpm i
-pnpm -C packages/cli dev --help
+```
+
+Run the web app:
+
+```bash
+pnpm dev
+```
+
+Run the CLI:
+
+```bash
+pnpm dev:cli -- --help
 ```
 
 ## POC Spec

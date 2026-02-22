@@ -3,7 +3,8 @@
   "private": true,
   "packageManager": "pnpm@9.15.0",
   "scripts": {
-    "dev": "pnpm -C packages/cli dev",
+    "dev": "pnpm -C apps/web dev",
+    "dev:cli": "pnpm -C packages/cli dev",
     "build": "pnpm -r build",
     "lint": "pnpm -r lint",
     "typecheck": "pnpm -r typecheck"
