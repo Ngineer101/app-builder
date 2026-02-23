@@ -1,10 +1,10 @@
 # DB setup (app-builder)
 
-This project uses Postgres + Drizzle.
+This project uses SQLite + Drizzle.
 
 ## Env
 
-- `DATABASE_URL` (Postgres connection string)
+- `DATABASE_PATH` (SQLite file path, e.g. `./app-builder.db`)
 - `BETTER_AUTH_URL` (e.g. `http://localhost:3000` or your deployed URL)
 
 ## Better Auth schema

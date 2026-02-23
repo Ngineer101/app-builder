@@ -43,7 +43,7 @@ pnpm dev:cli -- --help
 
 Required:
 - `OPENAI_API_KEY` (forwarded into sandboxes so `opencode` can generate code)
-- `DATABASE_URL` (Postgres connection string)
+- `DATABASE_PATH` (SQLite file path, e.g. `./apps/web/app-builder.db`)
 - `BETTER_AUTH_URL` (e.g. `http://localhost:3000` or your deployed URL)
 
 Vercel Sandbox auth:

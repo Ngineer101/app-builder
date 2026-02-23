@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 
 import { authClient } from "@/lib/auth-client";
+import { on } from "node:process";
 
 export default function SignUpPage() {
   const router = useRouter();
@@ -14,7 +15,8 @@ export default function SignUpPage() {
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
-  async function signUp() {
+  async function signUp(ev: any) {
+    ev.preventDefault();
     setBusy(true);
     setError(null);
     try {
@@ -38,9 +40,11 @@ export default function SignUpPage() {
   return (
     <div className="mx-auto flex min-h-dvh max-w-[420px] flex-col justify-center px-6 py-10">
       <h1 className="text-2xl font-semibold tracking-tight">Sign up</h1>
-      <p className="mt-2 text-sm text-white/60">Create an account to manage sandboxes.</p>
+      <p className="mt-2 text-sm text-white/60">
+        Create an account to manage sandboxes.
+      </p>
 
-      <div className="mt-6 grid gap-3">
+      <form className="mt-6 grid gap-3" onSubmit={signUp}>
         <input
           className="w-full rounded-xl border border-white/10 bg-black/40 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-emerald-400/40"
           placeholder="name"
@@ -70,10 +74,14 @@ export default function SignUpPage() {
           value={password}
           onChange={(e) => setPassword(e.target.value)}
         />
-        {error && <div className="rounded-xl border border-red-500/20 bg-red-500/10 p-3 text-sm text-red-200">{error}</div>}
+        {error && (
+          <div className="rounded-xl border border-red-500/20 bg-red-500/10 p-3 text-sm text-red-200">
+            {error}
+          </div>
+        )}
         <button
           className="rounded-xl bg-white px-3 py-2 text-sm font-medium text-black disabled:opacity-50"
-          onClick={signUp}
+          type="submit"
           disabled={busy || !name || !email || !password}
         >
           {busy ? "Creating account…" : "Sign up"}
@@ -85,7 +93,7 @@ export default function SignUpPage() {
             Sign in
           </a>
         </div>
-      </div>
+      </form>
     </div>
   );
 }

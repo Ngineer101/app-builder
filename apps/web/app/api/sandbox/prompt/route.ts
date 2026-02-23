@@ -47,8 +47,15 @@ export async function POST(req: Request) {
     if (process.env.OPENAI_API_KEY) env.OPENAI_API_KEY = process.env.OPENAI_API_KEY;
 
     const cwd = kit.appDir ? `/vercel/sandbox/${kit.appDir}` : "/vercel/sandbox";
-    const safe = text.replace(/"/g, "\\\"");
-    const cmdText = `opencode run \"${safe}\"`;
+    const executionPrompt = [
+      "You are working inside an existing project workspace.",
+      "First inspect the repository files to infer the stack/framework and implementation location.",
+      "Do not ask the user clarifying questions unless absolutely blocked by missing secrets/credentials.",
+      "Implement directly, then run the project's check command before finishing.",
+      "User request:",
+      text,
+    ].join("\n\n");
+    const cmdText = `opencode run ${JSON.stringify(executionPrompt)}`;
 
     const runOnce = async (sendLog?: (m: string) => void) => {
       // opencode
@@ -59,7 +66,7 @@ export async function POST(req: Request) {
         args: ["-lc", cmdText],
         cwd,
         env,
-        detached: true,
+        detached: false,
       });
 
       for await (const l of op.logs()) {
@@ -75,7 +82,7 @@ export async function POST(req: Request) {
         args: ["-lc", kit.check.cmd],
         cwd: checkCwd,
         env,
-        detached: true,
+        detached: false,
       });
       for await (const l of check.logs()) {
         sendLog?.(l.data);

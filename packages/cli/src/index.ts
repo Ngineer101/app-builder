@@ -78,8 +78,15 @@ program
     const sandbox = await Sandbox.get({ sandboxId: entry.sandboxId });
 
     // Run opencode inside the sandbox so auth/env comes from Vercel.
-    const prompt = String(opts.text).replace(/"/g, '\\"');
-    const cmd = `opencode run "${prompt}"`;
+    const executionPrompt = [
+      "You are working inside an existing project workspace.",
+      "First inspect the repository files to infer the stack/framework and implementation location.",
+      "Do not ask the user clarifying questions unless absolutely blocked by missing secrets/credentials.",
+      "Implement directly, then run the project's check command before finishing.",
+      "User request:",
+      String(opts.text),
+    ].join("\n\n");
+    const cmd = `opencode run ${JSON.stringify(executionPrompt)}`;
 
     console.log(`opencode: ${cmd}`);
     const res = await run(sandbox, { cmd, cwd: kit.appDir, detached: false });

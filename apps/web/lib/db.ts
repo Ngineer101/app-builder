@@ -1,20 +1,27 @@
-import postgres from "postgres";
-import { drizzle } from "drizzle-orm/postgres-js";
+import Database from "better-sqlite3";
+import { drizzle } from "drizzle-orm/better-sqlite3";
 
 import * as schema from "./schema";
 
 let _db: ReturnType<typeof drizzle> | null = null;
+let _sqlite: Database.Database | null = null;
+
+export function sqliteClient() {
+  if (_sqlite) return _sqlite;
+
+  const sqlitePath = process.env.DATABASE_PATH;
+  if (!sqlitePath) {
+    throw new Error("DATABASE_PATH is required");
+  }
+
+  _sqlite = new Database(sqlitePath);
+  _sqlite.pragma("journal_mode = WAL");
+  return _sqlite;
+}
 
 export function db() {
   if (_db) return _db;
 
-  const connectionString = process.env.DATABASE_URL;
-  if (!connectionString) {
-    throw new Error("DATABASE_URL is required");
-  }
-
-  // Disable prefetch in serverless environments
-  const client = postgres(connectionString, { prepare: false });
-  _db = drizzle(client, { schema });
+  _db = drizzle(sqliteClient(), { schema });
   return _db;
 }
