@@ -1,91 +1,174 @@
-import { NextResponse } from "next/server";
 import { Sandbox } from "@vercel/sandbox";
 import { kits, KitId } from "@app-builder/core";
+import { NextResponse } from "next/server";
+
+import { db } from "@/lib/db";
+import { sandboxes } from "@/lib/schema";
+
+import { cleanupExpiredSandboxes } from "../_lib/cleanup";
+import { requireSession } from "../_lib/session";
+import { sseData, sseHeaders } from "../_lib/sse";
 import { getSandboxAuth } from "../_lib/vercelSandboxAuth";
 
 export const runtime = "nodejs";
 
 export async function POST(req: Request) {
+  const accept = req.headers.get("accept") || "";
+  const wantsStream = accept.includes("text/event-stream");
+
   try {
+    const session = await requireSession();
+    await cleanupExpiredSandboxes(session.user.id);
+
     const body = (await req.json()) as any;
     const kitId = KitId.parse(body?.kitId);
     const kit = kits[kitId];
 
     const auth = getSandboxAuth();
 
-    const sandbox = await Sandbox.create({
-      ...auth,
-      runtime: kit.runtime,
-      ports: kit.ports,
-      timeout: 30 * 60 * 1000,
-    });
+    if (!wantsStream) {
+      // JSON fallback
+      const sandbox = await Sandbox.create({
+        ...auth,
+        runtime: kit.runtime,
+        ports: kit.ports,
+        timeout: 30 * 60 * 1000,
+      } as any);
 
-    // setup
-    for (const step of kit.setup) {
-      const cwd = step.cwd ? `/vercel/sandbox/${step.cwd}` : "/vercel/sandbox";
-      const res = await sandbox.runCommand({
+      for (const step of kit.setup) {
+        const cwd = step.cwd ? `/vercel/sandbox/${step.cwd}` : "/vercel/sandbox";
+        const res = await sandbox.runCommand({
+          cmd: "sh",
+          args: ["-lc", step.cmd],
+          cwd,
+          sudo: step.sudo,
+          detached: false,
+        });
+        if (res.exitCode !== 0) {
+          throw new Error(`setup failed: ${step.cmd}\n${await res.stdout()}\n${await res.stderr()}`);
+        }
+      }
+
+      const devCwd = kit.dev.cwd ? `/vercel/sandbox/${kit.dev.cwd}` : "/vercel/sandbox";
+      const devCmd = await sandbox.runCommand({
         cmd: "sh",
-        args: ["-lc", step.cmd],
-        cwd,
-        sudo: step.sudo,
-        detached: false,
+        args: ["-lc", kit.dev.cmd],
+        cwd: devCwd,
+        detached: true,
       });
 
-      if (res.exitCode !== 0) {
-        const stdout = await res.stdout();
-        const stderr = await res.stderr();
-        throw new Error(`setup failed: ${step.cmd}\n${stdout}\n${stderr}`);
-      }
+      const previewUrls: Record<string, string> = {};
+      for (const p of kit.ports) previewUrls[p] = sandbox.domain(p);
+
+      await db().insert(sandboxes).values({
+        userId: session.user.id,
+        kitId,
+        sandboxId: sandbox.sandboxId,
+        previewUrl: Object.values(previewUrls)[0] ?? null,
+      });
+
+      return NextResponse.json({
+        sandboxId: sandbox.sandboxId,
+        kitId,
+        devCmdId: devCmd.cmdId,
+        previewUrls,
+      });
     }
 
-    // start dev server
-    const devCwd = kit.dev.cwd
-      ? `/vercel/sandbox/${kit.dev.cwd}`
-      : "/vercel/sandbox";
-    const devCmd = await sandbox.runCommand({
-      cmd: "sh",
-      args: ["-lc", kit.dev.cmd],
-      cwd: devCwd,
-      detached: true,
-    });
+    // Streamed version
+    const stream = new ReadableStream<Uint8Array>({
+      async start(controller) {
+        const enc = new TextEncoder();
+        const send = (obj: any) => controller.enqueue(enc.encode(sseData(obj)));
 
-    console.log(`Dev server started with cmdId ${devCmd.cmdId}`);
-
-    const previewUrls: Record<string, string> = {};
-    for (const p of kit.ports) previewUrls[p] = sandbox.domain(p);
-
-    // QoL: wait until the dev server is reachable before returning
-    const firstPreview = Object.values(previewUrls)[0];
-    if (firstPreview) {
-      const deadline = Date.now() + 30_000;
-      let lastErr: any = null;
-      while (Date.now() < deadline) {
         try {
-          const r = await fetch(firstPreview, { cache: "no-store" });
-          if (r.ok) break;
-          lastErr = new Error(`HTTP ${r.status}`);
-        } catch (e) {
-          lastErr = e;
-        }
-        await new Promise((r) => setTimeout(r, 1000));
-      }
-      // don't hard-fail on readiness; return anyway so user can retry
-      if (lastErr) {
-        console.warn("preview not ready yet", String(lastErr));
-      }
-    }
+          send({ type: "step", stage: "create", message: "Creating sandbox…" });
 
-    return NextResponse.json({
-      sandboxId: sandbox.sandboxId,
-      kitId,
-      devCmdId: devCmd.cmdId,
-      previewUrls,
+          const sandbox = await Sandbox.create({
+            ...auth,
+            runtime: kit.runtime,
+            ports: kit.ports,
+            timeout: 30 * 60 * 1000,
+          } as any);
+
+          send({ type: "step", stage: "create", message: `sandboxId: ${sandbox.sandboxId}` });
+
+          for (const step of kit.setup) {
+            const cwd = step.cwd ? `/vercel/sandbox/${step.cwd}` : "/vercel/sandbox";
+            send({ type: "step", stage: "setup", message: step.cmd });
+
+            const cmd = await sandbox.runCommand({
+              cmd: "sh",
+              args: ["-lc", step.cmd],
+              cwd,
+              sudo: step.sudo,
+              detached: true,
+            });
+
+            for await (const line of cmd.logs()) {
+              send({ type: "log", message: line.data });
+            }
+
+            const finished = await cmd.wait();
+            if (finished.exitCode !== 0) {
+              throw new Error(`setup failed: ${step.cmd}`);
+            }
+          }
+
+          send({ type: "step", stage: "dev", message: "Starting dev server…" });
+          const devCwd = kit.dev.cwd ? `/vercel/sandbox/${kit.dev.cwd}` : "/vercel/sandbox";
+          const devCmd = await sandbox.runCommand({
+            cmd: "sh",
+            args: ["-lc", kit.dev.cmd],
+            cwd: devCwd,
+            detached: true,
+          });
+
+          const previewUrls: Record<string, string> = {};
+          for (const p of kit.ports) previewUrls[p] = sandbox.domain(p);
+
+          // wait for first preview
+          const firstPreview = Object.values(previewUrls)[0];
+          if (firstPreview) {
+            send({ type: "step", stage: "dev", message: "Waiting for preview…" });
+            const deadline = Date.now() + 30_000;
+            while (Date.now() < deadline) {
+              try {
+                const r = await fetch(firstPreview, { cache: "no-store" });
+                if (r.ok) break;
+              } catch {
+                // ignore
+              }
+              await new Promise((r) => setTimeout(r, 1000));
+            }
+          }
+
+          await db().insert(sandboxes).values({
+            userId: session.user.id,
+            kitId,
+            sandboxId: sandbox.sandboxId,
+            previewUrl: Object.values(previewUrls)[0] ?? null,
+          });
+
+          send({
+            type: "result",
+            result: {
+              sandboxId: sandbox.sandboxId,
+              kitId,
+              devCmdId: devCmd.cmdId,
+              previewUrls,
+            },
+          });
+        } catch (e: any) {
+          send({ type: "error", error: e?.message ?? String(e) });
+        } finally {
+          controller.close();
+        }
+      },
     });
+
+    return new Response(stream, { headers: sseHeaders() });
   } catch (e: any) {
-    console.error("Error creating sandbox:", e);
-    return NextResponse.json(
-      { error: e?.message ?? String(e) },
-      { status: 400 },
-    );
+    return NextResponse.json({ error: e?.message ?? String(e) }, { status: e?.message === "Unauthorized" ? 401 : 400 });
   }
 }

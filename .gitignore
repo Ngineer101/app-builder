@@ -13,5 +13,9 @@ node_modules
 # next
 /apps/web/.next
 /apps/web/out
+
+# local env
+/apps/web/.env.local
+/apps/web/.env.*.local
 .env*.local
 apps/web/tsconfig.tsbuildinfo

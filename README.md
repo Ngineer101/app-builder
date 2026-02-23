@@ -43,6 +43,8 @@ pnpm dev:cli -- --help
 
 Required:
 - `OPENAI_API_KEY` (forwarded into sandboxes so `opencode` can generate code)
+- `DATABASE_URL` (Postgres connection string)
+- `BETTER_AUTH_URL` (e.g. `http://localhost:3000` or your deployed URL)
 
 Vercel Sandbox auth:
 - On Vercel, OIDC *should* work automatically (recommended).
